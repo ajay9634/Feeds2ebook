@@ -1,41 +1,67 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 echo "========================================="
-echo "    Feed2ebook Automated Uninstaller    "
+echo "    Feeds2ebook Automated Uninstaller     "
 echo "========================================="
+echo ""
 
-# 1. Remove Application Files
-INSTALL_DIR="$HOME/.feed2ebook"
+# 1. Remove Application Directories (checking both lowercase and capitalized variants)
+INSTALL_DIRS=(
+    "$HOME/.feed2ebook"
+    "$HOME/.Feeds2ebook"
+)
 
-if [ -d "$INSTALL_DIR" ]; then
-    echo "[+] Removing installation directory: $INSTALL_DIR"
-    rm -rf "$INSTALL_DIR"
-else
-    echo "[-] Installation directory not found. Skipping."
-fi
+for dir in "${INSTALL_DIRS[@]}"; do
+    if [ -d "$dir" ]; then
+        echo "[+] Removing installation directory: $dir"
+        rm -rf "$dir"
+    else
+        echo "[-] Directory not found (skipped): $dir"
+    fi
+done
 
-# 2. Remove Terminal Shortcut Wrapper
+echo ""
+
+# 2. Remove Terminal Shortcut Wrappers
+BIN_NAMES=("feed2ebook" "Feeds2ebook")
+
+# Check for Termux environment first
 if [ -d "/data/data/com.termux/files/usr/bin" ]; then
-    WRAPPER_PATH="/data/data/com.termux/files/usr/bin/feed2ebook"
-    if [ -f "$WRAPPER_PATH" ]; then
-        echo "[+] Removing Termux binary shortcut..."
-        rm -f "$WRAPPER_PATH"
-    fi
-else
-    WRAPPER_PATH="/usr/local/bin/feed2ebook"
-    if [ -f "$WRAPPER_PATH" ]; then
-        echo "[+] Removing system binary shortcut..."
-        if [ -w "/usr/local/bin" ]; then
+    for name in "${BIN_NAMES[@]}"; do
+        WRAPPER_PATH="/data/data/com.termux/files/usr/bin/$name"
+        if [ -f "$WRAPPER_PATH" ]; then
+            echo "[+] Removing Termux shortcut: $name"
             rm -f "$WRAPPER_PATH"
-        else
-            sudo rm -f "$WRAPPER_PATH"
         fi
-    fi
+    done
+else
+    # Standard Linux / Desktop / Proot environments
+    POSSIBLE_BINS=(
+        "$HOME/.local/bin"
+        "/usr/local/bin"
+        "/usr/bin"
+    )
+
+    for bin_dir in "${POSSIBLE_BINS[@]}"; do
+        for name in "${BIN_NAMES[@]}"; do
+            WRAPPER_PATH="$bin_dir/$name"
+            if [ -f "$WRAPPER_PATH" ]; then
+                echo "[+] Removing binary shortcut: $WRAPPER_PATH"
+                if [ -w "$bin_dir" ]; then
+                    rm -f "$WRAPPER_PATH"
+                elif command -v sudo >/dev/null 2>&1; then
+                    sudo rm -f "$WRAPPER_PATH"
+                else
+                    echo "[!] Warning: No write permission for $bin_dir and sudo is unavailable. Skipping $WRAPPER_PATH."
+                fi
+            fi
+        done
+    done
 fi
 
 echo ""
 echo "========================================="
-echo "   [+] Uninstallation Complete!         "
+echo "   [+] Uninstallation Complete!          "
 echo "========================================="
