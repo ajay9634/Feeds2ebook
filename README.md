@@ -1,6 +1,6 @@
-# Feed2ebook 📚⚡
+# Feeds2ebook 📚⚡
 
-**Feed2ebook** is a lightweight, terminal-based RSS feed reader and ebook compiler. It automatically fetches news and blog articles from your favorite RSS feeds, extracts full-text clean content using Readability, and bundles them into neatly formatted **EPUB** books or custom **XML** feeds for offline reading on your phone or ereader.
+**Feeds2ebook** is a lightweight, terminal-based RSS feed reader and ebook compiler. It automatically fetches news and blog articles from your favorite RSS feeds, extracts full-text clean content using Readability, and bundles them into neatly formatted **EPUB** books or custom **XML** feeds for offline reading on your phone or ereader.
 
 ---
 
@@ -18,17 +18,17 @@
 
 ---
 
-## ⚡ Feed2ebook Installer and Updater
+## ⚡ Feeds2ebook Installer and Updater
 ### Automatic
 Note: Run `termux-setup-storage` first in Termux to allow saving to your Download folder. If you encounter a "CANNOT LINK EXECUTABLE" error, run `apt update && apt full-upgrade` and then run the installation command again.
 
 For **Termux** , run this command to install or update : 
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/ajay9634/Feed2ebook/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/ajay9634/Feeds2ebook/main/install.sh | bash
 ```
 
-After installation, launch the app anytime by typing: `feed2ebook`
+After installation, launch the app anytime by typing: `Feeds2ebook`
 
 ### Manual
 
@@ -38,17 +38,17 @@ Run these commands one by one :
 2. Termux Dependencies and package fix : `apt update && apt full-upgrade`
 3. Python Dependencies installation :
 ```bash
-curl -sSL https://raw.githubusercontent.com/ajay9634/Feed2ebook/main/dependencies.sh | bash
+curl -sSL https://raw.githubusercontent.com/ajay9634/Feeds2ebook/main/dependencies.sh | bash
 ```
-4. Run this to install or Update Feed2ebook :
+4. Run this to install or Update Feeds2ebook :
 ```bash
-curl -sSL https://raw.githubusercontent.com/ajay9634/Feed2ebook/main/install_feed2book.sh | bash
+curl -sSL https://raw.githubusercontent.com/ajay9634/Feeds2ebook/main/install_feeds2ebook.sh | bash
 ```
-5. After installation, launch the app anytime by typing: `feed2ebook`
+5. After installation, launch the app anytime by typing: `Feeds2ebook`
 ---
-## ⚡ Feed2ebook Installation using pip
+## ⚡ Feeds2ebook Installation using pip
 
-You can install `feed2ebook` directly from source or via GitHub using `pip`.
+You can install `Feeds2ebook` directly from source or via GitHub using `pip`.
 
 ### Prerequisites
 Make sure you have **Python 3.8+**, `pip`, and `git` installed on your system.
@@ -67,23 +67,23 @@ sudo apt update && sudo apt install python3 python3-pip python3-lxml python3-pil
 
 ### Installation
 ```bash
-pip install git+https://github.com/ajay9634/Feed2ebook.git
+pip install git+https://github.com/ajay9634/Feeds2ebook.git
 ```
 
 ---
 
-## 🗑️ Feed2ebook Uninstaller
+## 🗑️ Feeds2ebook Uninstaller
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/ajay9634/Feed2ebook/main/uninstall.sh | bash
+curl -sSL https://raw.githubusercontent.com/ajay9634/Feeds2ebook/main/uninstall.sh | bash
 ```
 OR
 
-```pip uninstall feed2ebook -y```
+```pip uninstall Feeds2ebook -y```
 
 ## Samples
 
 - **Sample Subscriptions:** [subscriptions.opml](./example/subscriptions.opml)
-- **Generated EPUB Digest:** [Feed2ebook_Digest_2026_07_31_07_53.epub](./example/Feed2ebook_Digest_2026_07_31_07_53.epub)
+- **Generated EPUB Digest:** [Feeds2ebook_Digest_2026_07_31_07_53.epub](./example/Feeds2ebook_Digest_2026_07_31_07_53.epub)
 
 ---
