@@ -760,15 +760,18 @@ def process_feeds():
         if not feed_url:
             continue
 
-        # Check if feed is explicitly disabled
-        if isinstance(feed_item, dict) and feed_item.get("status") == "disabled":
-            print(f"\nSkipping Disabled Feed: {feed_url}")
-            continue
+        # Check if feed is explicitly disabled via per-feed setting
+        feed_include_images_raw = feed_item.get("include_images") if isinstance(feed_item, dict) else None
+        if feed_include_images_raw is False:
+            feed_include_images = False
+        elif feed_include_images_raw is True:
+            feed_include_images = True
+        else:
+            feed_include_images = config.get("include_images", True)
 
         feed_max_days = get_feed_setting(feed_item, "max_days", config)
         feed_max_per_day = get_feed_setting(feed_item, "max_articles_per_day", config)
         feed_total_limit = get_feed_setting(feed_item, "total_articles_limit", config)
-        feed_include_images = get_feed_setting(feed_item, "include_images", config)
 
         if feed_include_images:
             if not check_image_dependencies():
@@ -1004,14 +1007,6 @@ def configure_single_feed_cli(feeds, idx, global_config):
     url = get_feed_url(feed)
 
     while True:
-        status_val = feed.get("status")
-        if status_val == "disabled":
-            status_str = "Disabled"
-        elif status_val == "enabled":
-            status_str = "Enabled"
-        else:
-            status_str = "Global (Default Enabled)"
-
         days_val = feed.get("max_days")
         if days_val is not None:
             days_str = "Unlimited" if days_val == 0 else f"{days_val} days"
@@ -1033,38 +1028,27 @@ def configure_single_feed_cli(feeds, idx, global_config):
             g_tl = global_config.get('total_articles_limit')
             tot_limit_str = f"Global Default ({'Unlimited' if not g_tl else str(g_tl) + ' total articles'})"
         
-        if "include_images" in feed and feed["include_images"] is not None:
-            img_str = "ENABLED" if feed["include_images"] else "DISABLED"
+        img_override = feed.get("include_images")
+        if img_override is True:
+            img_str = "Enabled"
+        elif img_override is False:
+            img_str = "Disabled"
         else:
-            img_str = f"Global Default ({'ENABLED' if global_config.get('include_images', True) else 'DISABLED'})"
+            img_str = f"Global (Default {'Enabled' if global_config.get('include_images', True) else 'Disabled'})"
 
         print("\n-----------------------------------------")
         print(f" Config Settings for Feed #{idx + 1}")
         print(f" URL: {url}")
         print("-----------------------------------------")
-        print(f"  1. Feed Status (enable/disable/global): {status_str}")
-        print(f"  2. Max Article Age (Days)     : {days_str}")
-        print(f"  3. Max Articles Per Day       : {day_limit_str}")
-        print(f"  4. Total Articles Limit       : {tot_limit_str}")
-        print(f"  5. Include Images Override    : {img_str}")
-        print("  6. Reset Feed to Global Defaults")
+        print(f"  1. Max Article Age (Days)     : {days_str}")
+        print(f"  2. Max Articles Per Day       : {day_limit_str}")
+        print(f"  3. Total Articles Limit       : {tot_limit_str}")
+        print(f"  4. Include Images Override    : {img_str}")
+        print("  5. Reset Feed to Global Defaults")
         print("  0. Save & Return to Feed Manager")
 
-        choice = input("\nChoose setting to modify (0-6): ").strip()
+        choice = input("\nChoose setting to modify (0-5): ").strip()
         if choice == "1":
-            print("\nFeed Status Options:")
-            print("  1. enable")
-            print("  2. disable")
-            print("  3. global (reset to default)")
-            sub_choice = input("Select option (1-3): ").strip()
-            if sub_choice == "1":
-                feed["status"] = "enabled"
-            elif sub_choice == "2":
-                feed["status"] = "disabled"
-            elif sub_choice == "3":
-                feed.pop("status", None)
-            save_feeds(feeds)
-        elif choice == "2":
             val = input("Enter max days (0 or 'unlimited' for Unlimited, Enter to reset to global): ").strip().lower()
             if val in ["0", "unlimited", "u"]:
                 feed["max_days"] = 0
@@ -1073,7 +1057,7 @@ def configure_single_feed_cli(feeds, idx, global_config):
             elif val == "":
                 feed.pop("max_days", None)
             save_feeds(feeds)
-        elif choice == "3":
+        elif choice == "2":
             val = input("Enter max articles per day (0 or 'unlimited' for Unlimited, Enter to reset to global): ").strip().lower()
             if val in ["0", "unlimited", "u"]:
                 feed["max_articles_per_day"] = 0
@@ -1082,7 +1066,7 @@ def configure_single_feed_cli(feeds, idx, global_config):
             elif val == "":
                 feed.pop("max_articles_per_day", None)
             save_feeds(feeds)
-        elif choice == "4":
+        elif choice == "3":
             val = input("Enter total articles limit (0 or 'unlimited' for Unlimited, Enter to reset to global): ").strip().lower()
             if val in ["0", "unlimited", "u"]:
                 feed["total_articles_limit"] = 0
@@ -1091,18 +1075,24 @@ def configure_single_feed_cli(feeds, idx, global_config):
             elif val == "":
                 feed.pop("total_articles_limit", None)
             save_feeds(feeds)
-        elif choice == "5":
-            current = feed.get("include_images")
-            if current is None or current is False:
+        elif choice == "4":
+            print("\nInclude Images Options:")
+            print("  1. Enabled")
+            print("  2. Disabled")
+            print("  3. Global")
+            img_choice = input("Select option (1-3): ").strip()
+            if img_choice == "1":
                 if check_image_dependencies():
                     feed["include_images"] = True
                 else:
                     print("[-] Missing Pillow library. Image override set to DISABLED.")
                     feed["include_images"] = False
-            else:
+            elif img_choice == "2":
+                feed["include_images"] = False
+            elif img_choice == "3":
                 feed.pop("include_images", None)
             save_feeds(feeds)
-        elif choice == "6":
+        elif choice == "5":
             feeds[idx] = {"url": url}
             feed = feeds[idx]
             save_feeds(feeds)
@@ -1125,9 +1115,6 @@ def manage_feeds_cli():
                 url = get_feed_url(f)
                 opts = []
                 if isinstance(f, dict):
-                    status_val = f.get("status")
-                    if status_val:
-                        opts.append(f"Status: {status_val.upper()}")
                     if "max_days" in f and f["max_days"] is not None:
                         opts.append(f"Days: {'Unlimited' if f['max_days'] == 0 else f['max_days']}")
                     if "max_articles_per_day" in f and f["max_articles_per_day"] is not None:
@@ -1135,14 +1122,14 @@ def manage_feeds_cli():
                     if "total_articles_limit" in f and f["total_articles_limit"] is not None:
                         opts.append(f"Total: {'Unlimited' if f['total_articles_limit'] == 0 else f['total_articles_limit']}")
                     if "include_images" in f and f["include_images"] is not None:
-                        opts.append(f"Images: {'ON' if f['include_images'] else 'OFF'}")
+                        opts.append(f"Images: {'Enabled' if f['include_images'] else 'Disabled'}")
                 
                 opts_str = f" [{', '.join(opts)}]" if opts else " [Global Defaults]"
                 print(f"  {idx}. {url}{opts_str}")
         
         print("\nCommands:")
         print("  [URL]           -> Add a new feed URL")
-        print("  [s <number>]    -> Configure per-feed settings (status, limits, days, images)")
+        print("  [s <number>]    -> Configure per-feed settings (limits, days, images)")
         print("  [del <number>]  -> Delete feed by number (e.g., del 2)")
         print("  [u <number>]    -> Move feed UP (e.g., u 3)")
         print("  [d <number>]    -> Move feed DOWN (e.g., d 1)")
