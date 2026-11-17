@@ -3,7 +3,7 @@
 set -e
 
 echo "========================================="
-echo "     Feed2ebook Dependencies Installer     "
+echo "     Feeds2ebook Dependencies Installer     "
 echo "========================================="
 
 # 1. Detect Environment & Install System Packages
