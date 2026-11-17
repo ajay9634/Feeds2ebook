@@ -747,9 +747,10 @@ def process_feeds():
         print("[-] No RSS feeds found. Add them manually or import via OPML first.")
         return
 
-    if config.get("include_images", True):
+    global_images = config.get("include_images", True)
+    if global_images:
         if not check_image_dependencies():
-            print("[-] Image dependencies missing. Disabling images for this run.")
+            print("[-] Image dependencies missing. Disabling images globally for this run.")
             config["include_images"] = False
 
     print(f"\n[+] Processing {len(feeds)} feed(s) with custom per-feed or global settings...")
@@ -760,22 +761,20 @@ def process_feeds():
         if not feed_url:
             continue
 
-        # Check if feed is explicitly disabled via per-feed setting
-        feed_include_images_raw = feed_item.get("include_images") if isinstance(feed_item, dict) else None
-        if feed_include_images_raw is False:
-            feed_include_images = False
-        elif feed_include_images_raw is True:
-            feed_include_images = True
-        else:
-            feed_include_images = config.get("include_images", True)
-
         feed_max_days = get_feed_setting(feed_item, "max_days", config)
         feed_max_per_day = get_feed_setting(feed_item, "max_articles_per_day", config)
         feed_total_limit = get_feed_setting(feed_item, "total_articles_limit", config)
-
-        if feed_include_images:
+        
+        # Determine include_images with global / enabled / disabled option logic per feed
+        feed_img_setting = feed_item.get("include_images") if isinstance(feed_item, dict) else None
+        if feed_img_setting == "enabled":
+            feed_include_images = True
             if not check_image_dependencies():
                 feed_include_images = False
+        elif feed_img_setting == "disabled":
+            feed_include_images = False
+        else: # "global" or unset
+            feed_include_images = config.get("include_images", True)
 
         days_display = "Unlimited" if not feed_max_days else f"{feed_max_days} days"
         per_day_display = "Unlimited" if not feed_max_per_day else f"{feed_max_per_day}"
@@ -1028,13 +1027,14 @@ def configure_single_feed_cli(feeds, idx, global_config):
             g_tl = global_config.get('total_articles_limit')
             tot_limit_str = f"Global Default ({'Unlimited' if not g_tl else str(g_tl) + ' total articles'})"
         
-        img_override = feed.get("include_images")
-        if img_override is True:
+        img_setting = feed.get("include_images")
+        if img_setting == "enabled":
             img_str = "Enabled"
-        elif img_override is False:
+        elif img_setting == "disabled":
             img_str = "Disabled"
         else:
-            img_str = f"Global (Default {'Enabled' if global_config.get('include_images', True) else 'Disabled'})"
+            g_img = "ENABLED" if global_config.get('include_images', True) else "DISABLED"
+            img_str = f"Global ({g_img})"
 
         print("\n-----------------------------------------")
         print(f" Config Settings for Feed #{idx + 1}")
@@ -1043,7 +1043,7 @@ def configure_single_feed_cli(feeds, idx, global_config):
         print(f"  1. Max Article Age (Days)     : {days_str}")
         print(f"  2. Max Articles Per Day       : {day_limit_str}")
         print(f"  3. Total Articles Limit       : {tot_limit_str}")
-        print(f"  4. Include Images Override    : {img_str}")
+        print(f"  4. Include Images Option      : {img_str}")
         print("  5. Reset Feed to Global Defaults")
         print("  0. Save & Return to Feed Manager")
 
@@ -1076,20 +1076,19 @@ def configure_single_feed_cli(feeds, idx, global_config):
                 feed.pop("total_articles_limit", None)
             save_feeds(feeds)
         elif choice == "4":
-            print("\nInclude Images Options:")
+            print("\nSelect Images Option for this feed:")
             print("  1. Enabled")
             print("  2. Disabled")
-            print("  3. Global")
-            img_choice = input("Select option (1-3): ").strip()
-            if img_choice == "1":
+            print("  3. Global (Use global default)")
+            sub_choice = input("Select option (1-3): ").strip()
+            if sub_choice == "1":
                 if check_image_dependencies():
-                    feed["include_images"] = True
+                    feed["include_images"] = "enabled"
                 else:
-                    print("[-] Missing Pillow library. Image override set to DISABLED.")
-                    feed["include_images"] = False
-            elif img_choice == "2":
-                feed["include_images"] = False
-            elif img_choice == "3":
+                    print("[-] Missing Pillow library. Cannot set to Enabled.")
+            elif sub_choice == "2":
+                feed["include_images"] = "disabled"
+            elif sub_choice == "3":
                 feed.pop("include_images", None)
             save_feeds(feeds)
         elif choice == "5":
@@ -1122,7 +1121,13 @@ def manage_feeds_cli():
                     if "total_articles_limit" in f and f["total_articles_limit"] is not None:
                         opts.append(f"Total: {'Unlimited' if f['total_articles_limit'] == 0 else f['total_articles_limit']}")
                     if "include_images" in f and f["include_images"] is not None:
-                        opts.append(f"Images: {'Enabled' if f['include_images'] else 'Disabled'}")
+                        img_val = f["include_images"]
+                        if img_val == "enabled":
+                            opts.append("Images: Enabled")
+                        elif img_val == "disabled":
+                            opts.append("Images: Disabled")
+                        else:
+                            opts.append(f"Images: {str(img_val).title()}")
                 
                 opts_str = f" [{', '.join(opts)}]" if opts else " [Global Defaults]"
                 print(f"  {idx}. {url}{opts_str}")
