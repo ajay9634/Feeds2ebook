@@ -27,9 +27,9 @@ HEADERS = {
 }
 
 PRESET_PATHS = {
-    "1": ("/sdcard/Download/Feed2ebook_Articles", "Phone Downloads Folder (/sdcard/Download)"),
-    "2": (os.path.expanduser("~/storage/downloads/Feed2ebook_Articles"), "Termux Shared Downloads (~/storage/downloads)"),
-    "3": (os.path.expanduser("~/Feed2ebook_Articles"), "Termux Internal Storage (~/Feed2ebook_Articles)"),
+    "1": ("/sdcard/Download/Feeds2ebook_Articles", "Phone Downloads Folder (/sdcard/Download)"),
+    "2": (os.path.expanduser("~/storage/downloads/Feeds2ebook_Articles"), "Termux Shared Downloads (~/storage/downloads)"),
+    "3": (os.path.expanduser("~/Feeds2ebook_Articles"), "Termux Internal Storage (~/Feeds2ebook_Articles)"),
 }
 
 VALID_FORMATS = ["epub", "xml", "html", "md", "all"]
@@ -100,7 +100,7 @@ def ensure_directory_exists(path):
         return path
     
     print(f"[-] Warning: Cannot write to '{path}': {err}")
-    fallback = os.path.expanduser("~/Feed2ebook_Articles")
+    fallback = os.path.expanduser("~/Feeds2ebook_Articles")
     print(f"[!] Falling back to internal storage directory: '{fallback}'")
     test_path_writable(fallback)
     return fallback
@@ -108,7 +108,7 @@ def ensure_directory_exists(path):
 def load_config():
     """Load configuration with default fallback."""
     default_config = {
-        "download_path": "/sdcard/Download/Feed2ebook_Articles",
+        "download_path": "/sdcard/Download/Feeds2ebook_Articles",
         "max_days": 7,                    # 0 or None means unlimited days
         "max_articles_per_day": 20,       # Number of feeds per day
         "total_articles_limit": 0,        # unlimited feed as default , per rss feed
@@ -213,7 +213,7 @@ def get_feed_setting(feed_item, key, global_config):
 def run_diagnostics():
     """Auto-checks environment, write permissions, and tests EPUB export."""
     print("\n=========================================")
-    print("   Feed2ebook System Diagnostics Check   ")
+    print("   Feeds2ebook System Diagnostics Check   ")
     print("=========================================")
     config = load_config()
     target_path = config["download_path"]
@@ -296,7 +296,7 @@ def export_opml(feeds, filepath):
     root = ET.Element("opml", version="1.0")
     head = ET.SubElement(root, "head")
     title = ET.SubElement(head, "title")
-    title.text = "Feed2ebook Subscriptions"
+    title.text = "Feeds2ebook Subscriptions"
     body = ET.SubElement(root, "body")
     
     for item in feeds:
@@ -553,7 +553,7 @@ def build_epub(articles_data, output_dir, base_filename, include_images=True, to
         book.set_identifier(str(time.time()))
         book.set_title(base_filename)
         book.set_language('en')
-        book.add_author("Feed2ebook")
+        book.add_author("Feeds2ebook")
 
         chapters = []
         spine = []
@@ -723,7 +723,7 @@ def export_rss_xml(articles_data, output_filepath, bundle_title):
         
         ET.SubElement(channel, "title").text = bundle_title
         ET.SubElement(channel, "link").text = "https://github.com"
-        ET.SubElement(channel, "description").text = "Generated Full-Text RSS Stream by Feed2ebook"
+        ET.SubElement(channel, "description").text = "Generated Full-Text RSS Stream by Feeds2ebook"
         
         for item_data in articles_data:
             item = ET.SubElement(channel, "item")
@@ -758,6 +758,11 @@ def process_feeds():
     for feed_item in feeds:
         feed_url = get_feed_url(feed_item)
         if not feed_url:
+            continue
+
+        # Check if feed is explicitly disabled
+        if isinstance(feed_item, dict) and feed_item.get("status") == "disabled":
+            print(f"\nSkipping Disabled Feed: {feed_url}")
             continue
 
         feed_max_days = get_feed_setting(feed_item, "max_days", config)
@@ -828,7 +833,7 @@ def process_feeds():
         return
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    base_title = f"Feed2ebook_Digest_{timestamp}"
+    base_title = f"Feeds2ebook_Digest_{timestamp}"
     fmt = config["export_format"].lower()
     inc_img = config.get("include_images", True)
     compress_img = config.get("compress_images", True)
@@ -852,7 +857,7 @@ def process_feeds():
         xml_filepath = os.path.join(config["download_path"], f"{sanitize_filename(base_title)}.xml")
         export_rss_xml(all_collected_articles, xml_filepath, base_title)
 
-    print("\n[+] Feed2ebook processing completed!")
+    print("\n[+] Feeds2ebook processing completed!")
 
 def init_colors():
     curses.start_color()
@@ -864,7 +869,7 @@ def init_colors():
     curses.init_pair(5, curses.COLOR_RED, -1)      
     curses.init_pair(6, curses.COLOR_MAGENTA, -1)  
 
-def draw_tui_menu(stdscr, selected_row, options, title="=== Feed2ebook Manager v0.4.3 ==="):
+def draw_tui_menu(stdscr, selected_row, options, title="=== Feeds2ebook Manager v0.4.4 ==="):
     stdscr.clear()
     h, w = stdscr.getmaxyx()
     
@@ -987,7 +992,7 @@ def curses_tui_loop(stdscr):
             elif current_row == 10:
                 return "exit"
             
-            input("\nPress Enter to return to Feed2ebook TUI...")
+            input("\nPress Enter to return to Feeds2ebook TUI...")
             stdscr = curses.initscr()
             curses.curs_set(0)
         elif key in [ord('q'), ord('Q')]:
@@ -999,6 +1004,14 @@ def configure_single_feed_cli(feeds, idx, global_config):
     url = get_feed_url(feed)
 
     while True:
+        status_val = feed.get("status")
+        if status_val == "disabled":
+            status_str = "Disabled"
+        elif status_val == "enabled":
+            status_str = "Enabled"
+        else:
+            status_str = "Global (Default Enabled)"
+
         days_val = feed.get("max_days")
         if days_val is not None:
             days_str = "Unlimited" if days_val == 0 else f"{days_val} days"
@@ -1029,15 +1042,29 @@ def configure_single_feed_cli(feeds, idx, global_config):
         print(f" Config Settings for Feed #{idx + 1}")
         print(f" URL: {url}")
         print("-----------------------------------------")
-        print(f"  1. Max Article Age (Days)     : {days_str}")
-        print(f"  2. Max Articles Per Day       : {day_limit_str}")
-        print(f"  3. Total Articles Limit       : {tot_limit_str}")
-        print(f"  4. Include Images Override    : {img_str}")
-        print("  5. Reset Feed to Global Defaults")
+        print(f"  1. Feed Status (enable/disable/global): {status_str}")
+        print(f"  2. Max Article Age (Days)     : {days_str}")
+        print(f"  3. Max Articles Per Day       : {day_limit_str}")
+        print(f"  4. Total Articles Limit       : {tot_limit_str}")
+        print(f"  5. Include Images Override    : {img_str}")
+        print("  6. Reset Feed to Global Defaults")
         print("  0. Save & Return to Feed Manager")
 
-        choice = input("\nChoose setting to modify (0-5): ").strip()
+        choice = input("\nChoose setting to modify (0-6): ").strip()
         if choice == "1":
+            print("\nFeed Status Options:")
+            print("  1. enable")
+            print("  2. disable")
+            print("  3. global (reset to default)")
+            sub_choice = input("Select option (1-3): ").strip()
+            if sub_choice == "1":
+                feed["status"] = "enabled"
+            elif sub_choice == "2":
+                feed["status"] = "disabled"
+            elif sub_choice == "3":
+                feed.pop("status", None)
+            save_feeds(feeds)
+        elif choice == "2":
             val = input("Enter max days (0 or 'unlimited' for Unlimited, Enter to reset to global): ").strip().lower()
             if val in ["0", "unlimited", "u"]:
                 feed["max_days"] = 0
@@ -1046,7 +1073,7 @@ def configure_single_feed_cli(feeds, idx, global_config):
             elif val == "":
                 feed.pop("max_days", None)
             save_feeds(feeds)
-        elif choice == "2":
+        elif choice == "3":
             val = input("Enter max articles per day (0 or 'unlimited' for Unlimited, Enter to reset to global): ").strip().lower()
             if val in ["0", "unlimited", "u"]:
                 feed["max_articles_per_day"] = 0
@@ -1055,7 +1082,7 @@ def configure_single_feed_cli(feeds, idx, global_config):
             elif val == "":
                 feed.pop("max_articles_per_day", None)
             save_feeds(feeds)
-        elif choice == "3":
+        elif choice == "4":
             val = input("Enter total articles limit (0 or 'unlimited' for Unlimited, Enter to reset to global): ").strip().lower()
             if val in ["0", "unlimited", "u"]:
                 feed["total_articles_limit"] = 0
@@ -1064,7 +1091,7 @@ def configure_single_feed_cli(feeds, idx, global_config):
             elif val == "":
                 feed.pop("total_articles_limit", None)
             save_feeds(feeds)
-        elif choice == "4":
+        elif choice == "5":
             current = feed.get("include_images")
             if current is None or current is False:
                 if check_image_dependencies():
@@ -1075,7 +1102,7 @@ def configure_single_feed_cli(feeds, idx, global_config):
             else:
                 feed.pop("include_images", None)
             save_feeds(feeds)
-        elif choice == "5":
+        elif choice == "6":
             feeds[idx] = {"url": url}
             feed = feeds[idx]
             save_feeds(feeds)
@@ -1098,6 +1125,9 @@ def manage_feeds_cli():
                 url = get_feed_url(f)
                 opts = []
                 if isinstance(f, dict):
+                    status_val = f.get("status")
+                    if status_val:
+                        opts.append(f"Status: {status_val.upper()}")
                     if "max_days" in f and f["max_days"] is not None:
                         opts.append(f"Days: {'Unlimited' if f['max_days'] == 0 else f['max_days']}")
                     if "max_articles_per_day" in f and f["max_articles_per_day"] is not None:
@@ -1112,7 +1142,7 @@ def manage_feeds_cli():
         
         print("\nCommands:")
         print("  [URL]           -> Add a new feed URL")
-        print("  [s <number>]    -> Configure per-feed settings (limits, days, images)")
+        print("  [s <number>]    -> Configure per-feed settings (status, limits, days, images)")
         print("  [del <number>]  -> Delete feed by number (e.g., del 2)")
         print("  [u <number>]    -> Move feed UP (e.g., u 3)")
         print("  [d <number>]    -> Move feed DOWN (e.g., d 1)")
@@ -1306,7 +1336,7 @@ def main_cli_menu():
         toc_mode = config.get("toc_style", "auto").upper()
         days_str = "Unlimited" if not config.get("max_days") else f"{config['max_days']}d"
         
-        print("\n=== Feed2ebook Manager v0.4.3 ===")
+        print("\n=== Feeds2ebook Manager v0.4.4 ===")
         print(f"1. Run Downloader (Format: {config['export_format'].upper()})")
         print(f"2. Manage & Configure Feeds ({len(load_feeds())} currently saved)")
         print("3. Import OPML File")
@@ -1356,4 +1386,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
