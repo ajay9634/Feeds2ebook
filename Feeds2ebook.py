@@ -545,7 +545,7 @@ def generate_toc_html(grouped_articles, is_epub=False, mode="auto"):
     toc_html += "</div><hr style='margin: 20px 0;'/>"
     return toc_html
 
-def build_epub(articles_data, output_dir, base_filename, include_images=True, toc_style="auto", quality=60, max_width=800, compress_images=True):
+def build_epub(articles_data, output_dir, base_filename, global_include_images=True, toc_style="auto", quality=60, max_width=800, compress_images=True, feeds_list=None):
     print(f"[+] Building EPUB file with {len(articles_data)} article(s) (TOC Style: {toc_style.upper()})...")
     try:
         output_dir = ensure_directory_exists(output_dir)
@@ -575,10 +575,37 @@ def build_epub(articles_data, output_dir, base_filename, include_images=True, to
             book.add_item(toc_chap)
             spine.append(toc_chap)
 
+        # Map feed_title or feed url to its setting if feeds_list provided
+        feed_image_map = {}
+        if feeds_list:
+            for f_item in feeds_list:
+                if isinstance(f_item, dict):
+                    f_url = f_item.get("url")
+                    f_img = f_item.get("include_images")
+                    if f_url:
+                        feed_image_map[f_url] = f_img
+
         for feed_title, items in grouped.items():
             for item in items:
                 html = item['html_content']
-                if include_images:
+                
+                # Determine image inclusion for this specific item/feed
+                item_url = item.get('url', '')
+                feed_setting = None
+                if feeds_list:
+                    for f_item in feeds_list:
+                        if isinstance(f_item, dict) and get_feed_url(f_item) == item.get('feed_url'):
+                            feed_setting = f_item.get("include_images")
+                            break
+
+                if feed_setting == "enabled":
+                    inc_imgs = True
+                elif feed_setting == "disabled":
+                    inc_imgs = False
+                else:
+                    inc_imgs = global_include_images
+
+                if inc_imgs:
                     html = process_and_embed_images(html, book, base_url=item['url'], quality=quality, max_width=max_width, compress_images=compress_images)
 
                 c = epub.EpubHtml(title=item['title'], file_name=item['epub_filename'], lang='en')
@@ -748,10 +775,20 @@ def process_feeds():
         return
 
     global_images = config.get("include_images", True)
-    if global_images:
+    
+    # We check if any feed requests images so we can conditionally check Pillow dependency
+    any_feed_enabled_images = global_images
+    for f_item in feeds:
+        if isinstance(f_item, dict):
+            f_img = f_item.get("include_images")
+            if f_img == "enabled":
+                any_feed_enabled_images = True
+                break
+
+    if any_feed_enabled_images:
         if not check_image_dependencies():
-            print("[-] Image dependencies missing. Disabling images globally for this run.")
-            config["include_images"] = False
+            print("[-] Image dependencies missing. Disabling image processing for this run.")
+            global_images = False
 
     print(f"\n[+] Processing {len(feeds)} feed(s) with custom per-feed or global settings...")
     all_collected_articles = []
@@ -774,7 +811,7 @@ def process_feeds():
         elif feed_img_setting == "disabled":
             feed_include_images = False
         else: # "global" or unset
-            feed_include_images = config.get("include_images", True)
+            feed_include_images = global_images
 
         days_display = "Unlimited" if not feed_max_days else f"{feed_max_days} days"
         per_day_display = "Unlimited" if not feed_max_per_day else f"{feed_max_per_day}"
@@ -822,6 +859,7 @@ def process_feeds():
                         "title": title or entry.get("title", "Untitled"),
                         "url": article_url,
                         "feed_title": feed_title,
+                        "feed_url": feed_url,
                         "html_content": html_content
                     })
                     total_count += 1
@@ -837,14 +875,13 @@ def process_feeds():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     base_title = f"Feeds2ebook_Digest_{timestamp}"
     fmt = config["export_format"].lower()
-    inc_img = config.get("include_images", True)
     compress_img = config.get("compress_images", True)
     toc_style = config.get("toc_style", "auto")
     quality = config.get("image_quality", 60)
     max_width = config.get("max_image_width", 800)
 
     if fmt == "epub":
-        build_epub(all_collected_articles, config["download_path"], base_title, include_images=inc_img, toc_style=toc_style, quality=quality, max_width=max_width, compress_images=compress_img)
+        build_epub(all_collected_articles, config["download_path"], base_title, global_include_images=global_images, toc_style=toc_style, quality=quality, max_width=max_width, compress_images=compress_img, feeds_list=feeds)
     elif fmt == "html":
         build_html(all_collected_articles, config["download_path"], base_title, toc_style=toc_style)
     elif fmt == "md":
@@ -853,7 +890,7 @@ def process_feeds():
         xml_filepath = os.path.join(config["download_path"], f"{sanitize_filename(base_title)}.xml")
         export_rss_xml(all_collected_articles, xml_filepath, base_title)
     elif fmt == "all":
-        build_epub(all_collected_articles, config["download_path"], base_title, include_images=inc_img, toc_style=toc_style, quality=quality, max_width=max_width, compress_images=compress_img)
+        build_epub(all_collected_articles, config["download_path"], base_title, global_include_images=global_images, toc_style=toc_style, quality=quality, max_width=max_width, compress_images=compress_img, feeds_list=feeds)
         build_html(all_collected_articles, config["download_path"], base_title, toc_style=toc_style)
         build_markdown(all_collected_articles, config["download_path"], base_title, toc_style=toc_style)
         xml_filepath = os.path.join(config["download_path"], f"{sanitize_filename(base_title)}.xml")
