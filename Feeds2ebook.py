@@ -579,7 +579,7 @@ def build_epub(articles_data, output_dir, base_filename, global_include_images=T
             for item in items:
                 html = item['html_content']
                 
-                # Resolve per-feed image setting vs global
+                # Resolve per-feed image setting vs global (supporting boolean or string values)
                 item_feed_url = item.get('feed_url')
                 feed_setting = "global"
                 if feeds_list:
@@ -588,9 +588,9 @@ def build_epub(articles_data, output_dir, base_filename, global_include_images=T
                             feed_setting = f_item.get("include_images", "global")
                             break
 
-                if feed_setting == "enabled":
+                if feed_setting is True or feed_setting == "enabled":
                     inc_imgs = True
-                elif feed_setting == "disabled":
+                elif feed_setting is False or feed_setting == "disabled":
                     inc_imgs = False
                 else:
                     inc_imgs = global_include_images
@@ -766,12 +766,12 @@ def process_feeds():
 
     global_images = config.get("include_images", True)
     
-    # Check if ANY feed (or global) needs images, and verify Pillow if so
+    # Check if ANY feed or global settings need images enabled, to verify Pillow dependency early
     any_feed_needs_images = global_images
     for f_item in feeds:
         if isinstance(f_item, dict):
             f_img = f_item.get("include_images")
-            if f_img == "enabled":
+            if f_img is True or f_img == "enabled":
                 any_feed_needs_images = True
                 break
 
@@ -792,11 +792,11 @@ def process_feeds():
         feed_max_per_day = get_feed_setting(feed_item, "max_articles_per_day", config)
         feed_total_limit = get_feed_setting(feed_item, "total_articles_limit", config)
         
-        # Determine include_images for this feed (Per-feed override takes precedence over global)
+        # Determine include_images for this feed (handling booleans and strings robustly)
         feed_img_setting = feed_item.get("include_images") if isinstance(feed_item, dict) else "global"
-        if feed_img_setting == "enabled":
+        if feed_img_setting is True or feed_img_setting == "enabled":
             feed_include_images = True
-        elif feed_img_setting == "disabled":
+        elif feed_img_setting is False or feed_img_setting == "disabled":
             feed_include_images = False
         else:
             feed_include_images = global_images
@@ -809,7 +809,7 @@ def process_feeds():
         if feed_max_days and feed_max_days > 0:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=feed_max_days)
 
-        print(f"\nFetching Feed: {feed_url} [Max Days: {days_display}, Feeds/Day: {per_day_display}, Total Limit: {total_display}, Images: {feed_img_setting.upper()}]")
+        print(f"\nFetching Feed: {feed_url} [Max Days: {days_display}, Feeds/Day: {per_day_display}, Total Limit: {total_display}, Images: {str(feed_img_setting).upper()}]")
         
         try:
             parsed_feed = feedparser.parse(feed_url)
@@ -1053,9 +1053,9 @@ def configure_single_feed_cli(feeds, idx, global_config):
             tot_limit_str = f"Global Default ({'Unlimited' if not g_tl else str(g_tl) + ' total articles'})"
         
         img_setting = feed.get("include_images")
-        if img_setting == "enabled":
+        if img_setting is True or img_setting == "enabled":
             img_str = "Enabled"
-        elif img_setting == "disabled":
+        elif img_setting is False or img_setting == "disabled":
             img_str = "Disabled"
         else:
             g_img = "ENABLED" if global_config.get('include_images', True) else "DISABLED"
@@ -1147,9 +1147,9 @@ def manage_feeds_cli():
                         opts.append(f"Total: {'Unlimited' if f['total_articles_limit'] == 0 else f['total_articles_limit']}")
                     if "include_images" in f and f["include_images"] is not None:
                         img_val = f["include_images"]
-                        if img_val == "enabled":
+                        if img_val is True or img_val == "enabled":
                             opts.append("Images: Enabled")
-                        elif img_val == "disabled":
+                        elif img_val is False or img_val == "disabled":
                             opts.append("Images: Disabled")
                         else:
                             opts.append(f"Images: {str(img_val).title()}")
