@@ -575,27 +575,17 @@ def build_epub(articles_data, output_dir, base_filename, global_include_images=T
             book.add_item(toc_chap)
             spine.append(toc_chap)
 
-        # Map feed_title or feed url to its setting if feeds_list provided
-        feed_image_map = {}
-        if feeds_list:
-            for f_item in feeds_list:
-                if isinstance(f_item, dict):
-                    f_url = f_item.get("url")
-                    f_img = f_item.get("include_images")
-                    if f_url:
-                        feed_image_map[f_url] = f_img
-
         for feed_title, items in grouped.items():
             for item in items:
                 html = item['html_content']
                 
-                # Determine image inclusion for this specific item/feed
-                item_url = item.get('url', '')
-                feed_setting = None
+                # Resolve per-feed image setting vs global
+                item_feed_url = item.get('feed_url')
+                feed_setting = "global"
                 if feeds_list:
                     for f_item in feeds_list:
-                        if isinstance(f_item, dict) and get_feed_url(f_item) == item.get('feed_url'):
-                            feed_setting = f_item.get("include_images")
+                        if isinstance(f_item, dict) and get_feed_url(f_item) == item_feed_url:
+                            feed_setting = f_item.get("include_images", "global")
                             break
 
                 if feed_setting == "enabled":
@@ -776,16 +766,16 @@ def process_feeds():
 
     global_images = config.get("include_images", True)
     
-    # We check if any feed requests images so we can conditionally check Pillow dependency
-    any_feed_enabled_images = global_images
+    # Check if ANY feed (or global) needs images, and verify Pillow if so
+    any_feed_needs_images = global_images
     for f_item in feeds:
         if isinstance(f_item, dict):
             f_img = f_item.get("include_images")
             if f_img == "enabled":
-                any_feed_enabled_images = True
+                any_feed_needs_images = True
                 break
 
-    if any_feed_enabled_images:
+    if any_feed_needs_images:
         if not check_image_dependencies():
             print("[-] Image dependencies missing. Disabling image processing for this run.")
             global_images = False
@@ -802,15 +792,13 @@ def process_feeds():
         feed_max_per_day = get_feed_setting(feed_item, "max_articles_per_day", config)
         feed_total_limit = get_feed_setting(feed_item, "total_articles_limit", config)
         
-        # Determine include_images with global / enabled / disabled option logic per feed
-        feed_img_setting = feed_item.get("include_images") if isinstance(feed_item, dict) else None
+        # Determine include_images for this feed (Per-feed override takes precedence over global)
+        feed_img_setting = feed_item.get("include_images") if isinstance(feed_item, dict) else "global"
         if feed_img_setting == "enabled":
             feed_include_images = True
-            if not check_image_dependencies():
-                feed_include_images = False
         elif feed_img_setting == "disabled":
             feed_include_images = False
-        else: # "global" or unset
+        else:
             feed_include_images = global_images
 
         days_display = "Unlimited" if not feed_max_days else f"{feed_max_days} days"
@@ -821,7 +809,7 @@ def process_feeds():
         if feed_max_days and feed_max_days > 0:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=feed_max_days)
 
-        print(f"\nFetching Feed: {feed_url} [Max Days: {days_display}, Feeds/Day: {per_day_display}, Total Limit: {total_display}]")
+        print(f"\nFetching Feed: {feed_url} [Max Days: {days_display}, Feeds/Day: {per_day_display}, Total Limit: {total_display}, Images: {feed_img_setting.upper()}]")
         
         try:
             parsed_feed = feedparser.parse(feed_url)
